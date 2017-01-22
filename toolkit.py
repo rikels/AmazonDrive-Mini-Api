@@ -14,9 +14,11 @@ def download(url,filename=None,path=None):
 		totalLength = None
 	if not filename:
 		try:
-			filename = re.search("filename=(\S+)",response.headers.get('content-disposition')).group(1)
+			filename = re.search("filename=(.*)",response.headers.get('content-disposition')).group(1).strip('"')
+			print("Getting filename from response")
 		except:
-			filename = url.split("/")[-1]
+			filename = url.split("/")[-1].strip('"')
+			print("Filename from URL")
 	#Checking if the path parameter has been filled
 	if path:
 		if not os.path.exists(path):
@@ -42,12 +44,10 @@ def download(url,filename=None,path=None):
 			dl = 0
 			#Response code 206 means that the host/server is able to resume our download
 			if response.status_code == 206:
-				print("File already exists, trying to resume (might fail, please delete if so)")
+				print("File already exists, host can resume. Trying to resume (this might fail, please delete the file if it doesn't work)")
 				totalLength = int(totalLength)-int(resumeByte)
 			else:
 				totalLength = int(totalLength)
-				os.remove(filename)
-				print("The host is unable to resume our download, we have removed the local download and restart")
 			for data in response.iter_content(chunk_size=4096):
 				dl += len(data)
 				f.write(data)
@@ -55,5 +55,5 @@ def download(url,filename=None,path=None):
 				sys.stdout.write("\r[{done}>{todo}] {:.2f}%	kbps:{:.2f}	{doneBytes}/{total}".format(((dl/totalLength)*100),(dl//(time.clock()-start))/1000,done=('='*done),todo=(' '*(50-done)),doneBytes=dl,total=totalLength))
 				sys.stdout.flush()
 	print("\r\nFile downloaded")
-	#Just returning some code that it was successful
+	#Returning a code (can be ignored, but for convenience should be checked)
 	return(200)
