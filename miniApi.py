@@ -1,11 +1,18 @@
 import requests
+import re
 
 class AmazonDrive(object):
 	"""This object creates an easy way to map all files and their properties from a shared AmazonDrive link"""
-	def __init__(self, shareId):
-		if shareId.startswith("http://") or shareId.startswith("https://"):
-			shareId = shareId.split("/")[-1]
-			shareId = shareId.split("?")[0]
+	def __init__(self, shareIdInput):
+		if shareIdInput.startswith("http://") or shareIdInput.startswith("https://"):
+			shareId = re.search("https?://.*/share/([\w\d]+)/?",shareIdInput).group(1)
+		if "/folder" in shareIdInput:
+			print("/folder in shareinput!")
+			print(shareIdInput)
+			self.folder = re.search("\/folder\/([\w\d]+)\??",shareIdInput).group(1)
+			print(self.folder)
+		else:
+			self.folder = str()
 		self.shareId = shareId.strip()
 		self.folders = dict()
 		self.files = list()
@@ -13,9 +20,12 @@ class AmazonDrive(object):
 		self.responsefolder = str()
 
 	def get(self):
-		url = "https://www.amazon.ca/drive/v1/shares/{shareId}?resourceVersion=V2&ContentType=JSON&asset=ALL".format(shareId=self.shareId)
+		url = "https://www.amazon.com/drive/v1/shares/{shareId}?resourceVersion=V2&ContentType=JSON&asset=ALL".format(shareId=self.shareId)
 		temp = requests.get(url)
-		url = "https://www.amazon.ca/drive/v1/nodes/{ID}/children?resourceVersion=V2&ContentType=JSON&limit=200&sort=%5B%22kind+DESC%22%2C+%22modifiedDate+ASC%22%5D&asset=ALL&tempLink=true&shareId={shareId}".format(ID=temp.json()["nodeInfo"]["id"],shareId=self.shareId)
+		if self.folder:
+			url = "https://www.amazon.com/drive/v1/nodes/{ID}/children?resourceVersion=V2&ContentType=JSON&sort=%5B%22kind+DESC%22%2C+%22modifiedDate+ASC%22%5D&asset=ALL&tempLink=true&shareId={shareId}".format(ID=self.folder,shareId=self.shareId)
+		else:
+			url = "https://www.amazon.com/drive/v1/nodes/{ID}/children?resourceVersion=V2&ContentType=JSON&sort=%5B%22kind+DESC%22%2C+%22modifiedDate+ASC%22%5D&asset=ALL&tempLink=true&shareId={shareId}".format(ID=temp.json()["nodeInfo"]["id"],shareId=self.shareId)
 		temp = requests.get(url)
 		folder = temp.json()["data"]
 		self.dumpAndReturn(folder)
