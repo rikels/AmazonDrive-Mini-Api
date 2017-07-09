@@ -6,9 +6,10 @@ urls = ["https://www.amazon.ca/clouddrive/share/oqTnk5GB7EnATDgSTJezVZzrpr0bFZNa
 #This downloader just downloads every file in the shares from the above pasted urls
 for url in urls:
 	#Creating the object, so we can get workable urls/info back
-	tets = miniApi.AmazonDrive(url)
-	#Calling the get function, so it will actually gather all info and "return" (store it in it's own variables) it.
-	tets.get()
-	for filee in tets.files:
+	AmazonSharedFolder = miniApi.AmazonDrive(url)
+	#Calling the get function, so it will actually gather all info and "return" it (store it in it's own variables).
+	AmazonSharedFolder.get()
+	for filee in AmazonSharedFolder.files:
 		#For each file, pass it to my download function
+		#You can also just write all the urls (tempLink) to a file and download it using wget, but this won't recreate the folder structure
 		toolkit.download(filee.tempLink,path=filee.path)
