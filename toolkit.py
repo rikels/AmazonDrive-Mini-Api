@@ -9,7 +9,7 @@ except ImportError:
      from urlparse import urlparse,unquote
 
 
-def download(url,filename=None,path=None,headers=None,proxies=None):
+def download(url,filename=None,path=None,headers=None,proxies=None,updateFrequency=1):
     #copied/changed from http://stackoverflow.com/questions/15644964/python-progress-bar-and-downloads
     print("Starting to download from url:{url}".format(url=url))
     response = requests.get(url, stream=True, headers=headers,verify=False)
@@ -31,7 +31,7 @@ def download(url,filename=None,path=None,headers=None,proxies=None):
     else:
         path = os.path.abspath(os.path.curdir)
         fullFilename = os.path.join(path,filename)
-    print(fullFilename.encode("utf-8"))
+    print(fullFilename)
     if os.path.isfile(fullFilename):
         resumeByte = os.path.getsize(fullFilename)
         if int(resumeByte) >= int(totalLength):
@@ -44,8 +44,16 @@ def download(url,filename=None,path=None,headers=None,proxies=None):
         response = requests.get(url, stream=True,headers=headers,verify=False)
     with open(fullFilename, "ab+") as f:
         start = time.clock()
+        lastUpdate = time.time()
         if totalLength is None: # no content length header
-            f.write(response.content)
+			dl = 0
+			for data in response.iter_content(chunk_size=1024):
+				dl += len(data)
+				f.write(data)
+				if (time.time() - lastUpdate) > updateFrequency:
+					sys.stdout.write("\rkbps:{speed}    {doneBytes}".format(speed=round(((dl//(time.clock()-start))/1000),2),doneBytes=dl))
+					sys.stdout.flush()
+					lastUpdate = time.time()
         else:
             dl = 0
             if response.status_code == 206:
@@ -56,16 +64,20 @@ def download(url,filename=None,path=None,headers=None,proxies=None):
             for data in response.iter_content(chunk_size=1024):
                 dl += len(data)
                 f.write(data)
-                done = int(50 * dl / totalLength -1)
-                sys.stdout.write("\r[{progress}>{todo}] {percent}%  kbps:{speed}    {doneBytes}/{total}".format(progress=('='*done),todo=(' '*(50-done)),percent=round(((dl/totalLength)*100),2),speed=round(((dl//(time.clock()-start))/1000),2),doneBytes=dl,total=totalLength))
-                sys.stdout.flush()
+                if (time.time() - lastUpdate) > updateFrequency:
+					done = int(50 * dl / totalLength -1)
+					sys.stdout.write("\r[{progress}>{todo}] {percent}%  kbps:{speed}    {doneBytes}/{total}".format(progress=('='*done),todo=(' '*(50-done)),percent=round(((dl/totalLength)*100),2),speed=round(((dl//(time.clock()-start))/1000),2),doneBytes=dl,total=totalLength))
+					sys.stdout.flush()
+					lastUpdate = time.time()
     print("\r\nFile downloaded")
     return({"status":200,"filename":filename,"path":path,"fullFilename":fullFilename})
 
-def downloadStream(filestream,url="leeg",filename=None,path=None,headers=None,proxies=None,forceResume=False):
+def downloadStream(filestream,url="leeg",filename=None,path=None,headers=None,proxies=None,forceResume=False,form=form):
     #copied/changed from http://stackoverflow.com/questions/15644964/python-progress-bar-and-downloads
+    url = filestream.url
     print("Starting to download from url:{url}".format(url=url))
     response = filestream
+    dir(response)
     try:
         totalLength = response.headers.get('content-length')
     except:
@@ -75,7 +87,7 @@ def downloadStream(filestream,url="leeg",filename=None,path=None,headers=None,pr
             filename = re.search("filename=\"?([\w._ \-&!@#$%~\^\(\)\[\]\+\=\{\}',;`]+)",response.headers.get('content-disposition')).group(1).strip('"')
             print("got filename from response")
         except:
-            filename = urllparse.unquote(url.split("/")[-1].strip('"'))
+            filename = unquote(url.split("/")[-1].strip('"'))
             print("created filename from url")
     if path:
         if path.startswith("/"):
@@ -86,7 +98,7 @@ def downloadStream(filestream,url="leeg",filename=None,path=None,headers=None,pr
     else:
         path = os.path.abspath(os.path.curdir)
         fullFilename = os.path.join(path,filename)
-    print(fullFilename.encode("utf-8"))
+    print(fullFilename)
     if os.path.isfile(fullFilename):
         #If the file is partially downloaded we want to resume the download (this is not always possible)
         resumeByte = os.path.getsize(fullFilename)
@@ -97,7 +109,10 @@ def downloadStream(filestream,url="leeg",filename=None,path=None,headers=None,pr
             headers["Range"] = "bytes={resumeByte}-".format(resumeByte=resumeByte)
         else:
             headers = {"Range": "bytes={resumeByte}-".format(resumeByte=resumeByte)}
-        response = requests.get(url, stream=True,headers=headers,verify=False)
+        if response.request.method == "POST":
+            response = requests.post(url, stream=True,headers=headers,data=form,cookies=response.cookies,verify=False)
+        elif response.request.method == "GET":
+            response = requests.get(url, stream=True,headers=headers,cookies=response.cookies,verify=False)
     with open(fullFilename, "ab+") as f:
         start = time.clock()
         if totalLength is None: # no content length header
